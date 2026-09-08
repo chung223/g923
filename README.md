@@ -49,12 +49,13 @@ make install    # 安裝到 ~/.local/g923 並載入 LaunchAgent
 
 ## 歐卡（ETS2，Steam 版）
 
-Euro Truck Simulator 2 是這個專案的主要目標。兩條路：
+完整分析見 [`docs/native-macos-ets2.md`](docs/native-macos-ets2.md)。重點：
 
-- **原生 macOS 版**：走 SDL；SDL2 的力回饋在 macOS 是透過 `ForceFeedback.framework`，所以我們的外掛可服務它（前提是該版本未啟用函式庫驗證擋外掛，需實機確認）。
-- **透過 CrossOver / Whisky 跑 Windows 版**：這條最穩，因為這些相容層帶 `disable-library-validation`，一定會載入外掛。
+- **原生 macOS 版沒有力回饋**。社群 2020–2026 一致回報：開得起來、方向盤能轉、按鍵能對應，但 FFB 不會動，SCS 從未修。而且原生版是 **x86_64 靠 Rosetta 2** 執行（非 arm64），效能也較差。
+- **要有力回饋 → 跑 Windows 版透過 CrossOver / Whisky**。這些相容層帶 `disable-library-validation`，一定載入我們的外掛。這是保證可用的路。
+- 本專案外掛已改為 **universal（x86_64 + arm64）**，因為 CFPlugIn 必須符合宿主 process 架構，而重要的宿主（Rosetta 遊戲、Wine 行程）是 x86_64。
 
-另外 ETS2/ATS 有官方 **SCS 遙測 SDK**，是「自製 TrueForce 振動層」（見 v2）最理想的訊號來源：可用引擎轉速、輪胎打滑、路面顆粒感產生高頻振動。
+ETS2/ATS 有官方 **SCS 遙測 SDK**，是「自製 TrueForce 振動層」（見 v2）最理想的訊號來源：可用引擎轉速、輪胎打滑、路面顆粒感產生高頻振動。
 
 ## TrueForce（v2，實驗中，需實機）
 

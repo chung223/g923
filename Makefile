@@ -9,7 +9,12 @@
 
 PREFIX      ?= $(HOME)/.local/g923
 CC          ?= clang
-CFLAGS      ?= -O2 -Wall -Wextra -Wno-unused-parameter -fno-common
+# Universal (x86_64 + arm64): the ForceFeedback plugin must match the host
+# process arch, and important hosts are x86_64 — native ETS2 runs under Rosetta,
+# and Wine/CrossOver processes are often x86_64. A CFPlugIn only loads if it has
+# a slice for the loading process's arch.
+ARCHS       ?= -arch arm64 -arch x86_64
+CFLAGS      ?= -O2 -Wall -Wextra -Wno-unused-parameter -fno-common $(ARCHS)
 COMMON_INC  := -Isrc/common
 FRAMEWORKS  := -framework IOKit -framework CoreFoundation
 FF_FRAMEWORK:= -framework ForceFeedback
@@ -69,7 +74,7 @@ scs-plugin: | $(BUILD)
 	@test -n "$(SCS_SDK)" || { echo "set SCS_SDK=/path/to/scs_sdk (see src/scs-plugin/README.md)"; exit 1; }
 	$(CC) $(CFLAGS) $(COMMON_INC) -I"$(SCS_SDK)/include" -dynamiclib \
 		-o $(BUILD)/g923_telemetry.dylib src/scs-plugin/g923_scs_plugin.c
-	@echo "built $(BUILD)/g923_telemetry.dylib — install per src/scs-plugin/README.md"
+	@echo "built $(BUILD)/g923_telemetry.dylib (universal) — native ETS2 is x86_64/Rosetta, so the x86_64 slice is what it loads. Install per src/scs-plugin/README.md"
 
 # Windows .dll for the game run under CrossOver / Whisky / Wine, cross-compiled
 # with mingw-w64 (brew install mingw-w64):
