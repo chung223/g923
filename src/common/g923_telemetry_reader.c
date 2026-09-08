@@ -9,9 +9,17 @@
 
 bool g923_telemetry_reader_open(g923_telemetry_reader *r) {
     memset(r, 0, sizeof(*r));
-    r->fd = shm_open(G923_TELEMETRY_SHM_NAME, O_RDONLY, 0);
-    if (r->fd < 0) return false;
     r->map_len = sizeof(g923_telemetry_shm);
+
+    /* 1) native game: POSIX shared memory. */
+    r->fd = shm_open(G923_TELEMETRY_SHM_NAME, O_RDONLY, 0);
+
+    /* 2) Windows game under Wine/CrossOver: file-backed block at the path the
+     *    plugin's Z:\tmp\... maps to on this Mac. */
+    if (r->fd < 0)
+        r->fd = open(G923_TELEMETRY_FILE_PATH, O_RDONLY);
+
+    if (r->fd < 0) return false;
     r->map = mmap(NULL, r->map_len, PROT_READ, MAP_SHARED, r->fd, 0);
     if (r->map == MAP_FAILED) { close(r->fd); r->fd = -1; r->map = NULL; return false; }
     return true;

@@ -15,10 +15,6 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #include "scssdk_telemetry.h"
 #include "eurotrucks2/scssdk_eut2.h"
@@ -28,10 +24,58 @@
 
 #include "g923_telemetry_shm.h"
 
+#ifdef _WIN32
+#define G923_EXPORT __declspec(dllexport)
+#else
+#define G923_EXPORT
+#endif
+
 static g923_telemetry_shm *g_shm = NULL;
-static int g_fd = -1;
 static scs_log_t g_log = NULL;
 
+/*
+ * Two transports for the shared block:
+ *  - native (macOS/Linux game): POSIX shm at G923_TELEMETRY_SHM_NAME.
+ *  - Windows build under Wine/CrossOver: a file-backed mapping at
+ *    Z:\tmp\g923_telemetry.bin. Wine maps drive Z: to macOS "/" by default, so
+ *    that file IS /tmp/g923_telemetry.bin on the Mac side, which our reader
+ *    picks up automatically (see g923_telemetry_reader). Coherence across the
+ *    Wine boundary must be verified on hardware.
+ */
+#ifdef _WIN32
+#include <windows.h>
+static HANDLE g_file = INVALID_HANDLE_VALUE;
+static HANDLE g_mapping = NULL;
+/* Where the Mac reader looks: G923_TELEMETRY_FILE_PATH == /tmp/g923_telemetry.bin */
+#define G923_WIN_SHARED_PATH "Z:\\tmp\\g923_telemetry.bin"
+static bool shm_create(void) {
+    g_file = CreateFileA(G923_WIN_SHARED_PATH, GENERIC_READ | GENERIC_WRITE,
+                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                         OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (g_file == INVALID_HANDLE_VALUE) return false;
+    g_mapping = CreateFileMappingA(g_file, NULL, PAGE_READWRITE, 0,
+                                   (DWORD)sizeof(g923_telemetry_shm), NULL);
+    if (!g_mapping) { CloseHandle(g_file); g_file = INVALID_HANDLE_VALUE; return false; }
+    g_shm = (g923_telemetry_shm *)MapViewOfFile(g_mapping, FILE_MAP_ALL_ACCESS, 0, 0,
+                                                sizeof(g923_telemetry_shm));
+    if (!g_shm) { CloseHandle(g_mapping); CloseHandle(g_file); g_mapping = NULL; g_file = INVALID_HANDLE_VALUE; return false; }
+    memset(g_shm, 0, sizeof(*g_shm));
+    g_shm->magic = G923_TELEMETRY_MAGIC;
+    g_shm->version = G923_TELEMETRY_VERSION;
+    return true;
+}
+static void shm_destroy(void) {
+    if (g_shm) { g_shm->connected = 0; FlushViewOfFile(g_shm, sizeof(*g_shm)); UnmapViewOfFile(g_shm); }
+    if (g_mapping) CloseHandle(g_mapping);
+    if (g_file != INVALID_HANDLE_VALUE) CloseHandle(g_file);
+    g_shm = NULL; g_mapping = NULL; g_file = INVALID_HANDLE_VALUE;
+}
+#else
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+static int g_fd = -1;
 static bool shm_create(void) {
     g_fd = shm_open(G923_TELEMETRY_SHM_NAME, O_CREAT | O_RDWR, 0600);
     if (g_fd < 0) return false;
@@ -50,6 +94,7 @@ static void shm_destroy(void) {
     g_shm = NULL; g_fd = -1;
     shm_unlink(G923_TELEMETRY_SHM_NAME);
 }
+#endif
 
 /* ---- channel callbacks ---- */
 static SCSAPI_VOID chan_float(const scs_string_t name, const scs_u32_t index,
@@ -113,7 +158,7 @@ static SCSAPI_VOID ev_config(const scs_event_t event, const void *const info, co
 }
 
 /* ---- entry points ---- */
-SCSAPI_RESULT scs_telemetry_init(const scs_u32_t version, const scs_telemetry_init_params_t *const params) {
+G923_EXPORT SCSAPI_RESULT scs_telemetry_init(const scs_u32_t version, const scs_telemetry_init_params_t *const params) {
     if (version != SCS_TELEMETRY_VERSION_1_00) return SCS_RESULT_unsupported;
     const scs_telemetry_init_params_v100_t *const v =
         (const scs_telemetry_init_params_v100_t *)params;
@@ -145,7 +190,7 @@ SCSAPI_RESULT scs_telemetry_init(const scs_u32_t version, const scs_telemetry_in
     return SCS_RESULT_ok;
 }
 
-SCSAPI_VOID scs_telemetry_shutdown(void) {
+G923_EXPORT SCSAPI_VOID scs_telemetry_shutdown(void) {
     shm_destroy();
     g_log = NULL;
 }

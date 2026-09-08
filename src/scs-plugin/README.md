@@ -17,22 +17,38 @@
 - 遊戲安裝目錄下常附一份（例如 Steam 的 ETS2 資料夾內 `sdk/`）。
 - 或從 SCS 官方 modding wiki 下載遙測 SDK（`scs_sdk_x.xx.zip`），解壓後裡面有 `include/`。
 
-## 編譯（macOS，給原生 Mac 版遊戲用）
+## 編譯
+
+同一份 `g923_scs_plugin.c` 兩種目標，差別只在共享資料的傳輸方式（見下）。
+
+### A. 原生 Mac 版遊戲 → `.dylib`
 
 ```bash
 make scs-plugin SCS_SDK=/path/to/scs_sdk
 # 產出 build/g923_telemetry.dylib
 ```
 
+### B. CrossOver / Whisky / Wine 跑的 Windows 版遊戲 → `.dll`（交叉編譯）
+
+需要 mingw-w64：
+
+```bash
+brew install mingw-w64
+make scs-plugin-win SCS_SDK=/path/to/scs_sdk
+# 產出 build/g923_telemetry.dll（x86_64）
+```
+
+## 跨 Wine 邊界怎麼共享資料
+
+- **原生版**：外掛用 POSIX 共享記憶體 `/g923_telemetry`；讀取器直接讀。
+- **Windows 版（Wine）**：Windows 外掛在 Wine 裡，macOS 讀取器在外面，不能共用同一個具名記憶體。做法是**檔案支援的記憶體映射**：外掛寫 `Z:\tmp\g923_telemetry.bin`，而 Wine 預設把磁碟 `Z:` 對應到 macOS 的 `/`，所以那個檔就是 macOS 的 `/tmp/g923_telemetry.bin`。讀取器會自動先找 POSIX 共享記憶體，找不到再讀這個檔，兩種情況都不用改設定。
+- ⚠️ 跨 Wine 邊界的記憶體一致性需**實機驗證**；若不穩，備援方案是改用 localhost UDP（外掛送、`g923d` 收）。
+
 ## 安裝
 
-把產出的外掛放進遊戲的 `plugins/` 資料夾：
-
-- **原生 macOS 版 ETS2**：在遊戲的 app bundle 內
-  `Euro Truck Simulator 2.app/Contents/.../bin/<arch>/plugins/`（若無 `plugins` 就自己建）。
-- **透過 CrossOver/Whisky 跑的 Windows 版**：需要 **Windows 版外掛（.dll）**，不是這個 `.dylib`。
-  要在 Windows 上（或用 mingw 交叉編譯）用同一份 `g923_scs_plugin.c` + SCS SDK 編成 `g923_telemetry.dll`，
-  放進 Windows 遊戲的 `bin/win_x64/plugins/`。這條之後再補。
+- **原生 macOS 版 ETS2**：把 `.dylib` 放進遊戲 app bundle 內 `.../bin/<arch>/plugins/`（沒有 `plugins` 就自己建）。
+- **CrossOver/Whisky 的 Windows 版**：把 `.dll` 放進該 bottle 裡遊戲的 `bin/win_x64/plugins/`。
+- 確認 Wine 的 `Z:` 仍對應 `/`（預設如此）。
 
 ## 驗證（不需方向盤）
 

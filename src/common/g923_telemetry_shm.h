@@ -15,7 +15,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define G923_TELEMETRY_SHM_NAME  "/g923_telemetry"   /* shm_open name */
+#define G923_TELEMETRY_SHM_NAME  "/g923_telemetry"   /* POSIX shm_open name (native game) */
+/* File-backed fallback used across the Wine boundary: the Windows plugin writes
+ * Z:\tmp\g923_telemetry.bin, which is this path on the macOS side. */
+#define G923_TELEMETRY_FILE_PATH "/tmp/g923_telemetry.bin"
 #define G923_TELEMETRY_MAGIC     0x47393233u         /* 'G923' */
 #define G923_TELEMETRY_VERSION   1u
 #define G923_TELEMETRY_MAX_WHEELS 8

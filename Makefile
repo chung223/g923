@@ -24,7 +24,7 @@ SCS_SDK ?=
 PLUGIN_BUNDLE := $(BUILD)/G923FF.plugin
 PLUGIN_BIN    := $(PLUGIN_BUNDLE)/Contents/MacOS/G923FF
 
-.PHONY: all plugin daemon cli tools tests test e2e clean install uninstall sign scs-plugin
+.PHONY: all plugin daemon cli tools tests test e2e clean install uninstall sign scs-plugin scs-plugin-win
 
 all: plugin daemon cli tools tests
 
@@ -63,12 +63,25 @@ $(BUILD)/g923_telemetry_dump: src/tools/g923_telemetry_dump.c $(COMMON_SRC) | $(
 	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/tools/g923_telemetry_dump.c $(COMMON_SRC) $(FRAMEWORKS)
 
 # --- SCS telemetry plugin (needs the official SCS SDK; not built by default) ---
-# usage: make scs-plugin SCS_SDK=/path/to/scs_sdk
+# macOS .dylib for the NATIVE Mac game:
+#   make scs-plugin SCS_SDK=/path/to/scs_sdk
 scs-plugin: | $(BUILD)
 	@test -n "$(SCS_SDK)" || { echo "set SCS_SDK=/path/to/scs_sdk (see src/scs-plugin/README.md)"; exit 1; }
 	$(CC) $(CFLAGS) $(COMMON_INC) -I"$(SCS_SDK)/include" -dynamiclib \
 		-o $(BUILD)/g923_telemetry.dylib src/scs-plugin/g923_scs_plugin.c
 	@echo "built $(BUILD)/g923_telemetry.dylib — install per src/scs-plugin/README.md"
+
+# Windows .dll for the game run under CrossOver / Whisky / Wine, cross-compiled
+# with mingw-w64 (brew install mingw-w64):
+#   make scs-plugin-win SCS_SDK=/path/to/scs_sdk
+MINGW ?= x86_64-w64-mingw32-gcc
+scs-plugin-win: | $(BUILD)
+	@command -v $(MINGW) >/dev/null 2>&1 || { echo "need mingw-w64: brew install mingw-w64 (or set MINGW=<compiler>)"; exit 1; }
+	@test -n "$(SCS_SDK)" || { echo "set SCS_SDK=/path/to/scs_sdk (see src/scs-plugin/README.md)"; exit 1; }
+	$(MINGW) -O2 -Wall -Wextra -Wno-unused-parameter $(COMMON_INC) -I"$(SCS_SDK)/include" \
+		-shared -static-libgcc -o $(BUILD)/g923_telemetry.dll \
+		src/scs-plugin/g923_scs_plugin.c -Wl,--enable-stdcall-fixup
+	@echo "built $(BUILD)/g923_telemetry.dll — install into the bottle per src/scs-plugin/README.md"
 
 # --- tests ---
 tests: $(BUILD)/test_protocol $(BUILD)/test_telemetry $(BUILD)/ff_probe
