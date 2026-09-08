@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleIdentifier</key><string>dev.g923.forcefeedback</string>
+    <key>CFBundleName</key><string>G923FF</string>
+    <key>CFBundleDisplayName</key><string>G923 Force Feedback</string>
+    <key>CFBundleExecutable</key><string>G923FF</string>
+    <key>CFBundlePackageType</key><string>BNDL</string>
+    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFPlugInDynamicRegistration</key><string>NO</string>
+    <key>CFPlugInFactories</key>
+    <dict>
+        <key>6E2A9F44-3C21-4E7A-9C4E-1A2B3C4D5E6F</key>
+        <string>G923ForceFeedbackFactory</string>
+    </dict>
+    <key>CFPlugInTypes</key>
+    <dict>
+        <!-- kIOForceFeedbackLibTypeID -->
+        <key>F4545CE5-BF5B-11D6-A4BB-0003933E3E3E</key>
+        <array>
+            <string>6E2A9F44-3C21-4E7A-9C4E-1A2B3C4D5E6F</string>
+        </array>
+    </dict>
+</dict>
+</plist>

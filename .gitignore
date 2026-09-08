@@ -1,0 +1,6 @@
+# build output
+/build/
+# macOS
+.DS_Store
+# editor
+*.swp
