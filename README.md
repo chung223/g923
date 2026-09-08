@@ -55,7 +55,23 @@ make install    # 安裝到 ~/.local/g923 並載入 LaunchAgent
 - **要有力回饋 → 跑 Windows 版透過 CrossOver / Whisky**。這些相容層帶 `disable-library-validation`，一定載入我們的外掛。這是保證可用的路。
 - 本專案外掛已改為 **universal（x86_64 + arm64）**，因為 CFPlugIn 必須符合宿主 process 架構，而重要的宿主（Rosetta 遊戲、Wine 行程）是 x86_64。
 
-ETS2/ATS 有官方 **SCS 遙測 SDK**，是「自製 TrueForce 振動層」（見 v2）最理想的訊號來源：可用引擎轉速、輪胎打滑、路面顆粒感產生高頻振動。
+### 原生歐卡的力回饋：遙測直驅（v2）
+
+實測你這台的原生 ETS2：它**不呼叫任何 macOS FFB API**（無 ForceFeedback.framework、無 SDL），所以遊戲本身在 Mac 上不輸出力回饋，我們的 ForceFeedback 外掛也幫不上原生版。**但**它的簽章關閉了函式庫驗證、且內建 SCS 遙測外掛載入器，所以原生要有力回饋只有一條路：**遙測直驅**——讀遊戲遙測，自己用 IOKit 對方向盤下經典 FFB 指令。
+
+已實作 `g923_ffb_telemetry`：把遙測轉成置中彈簧（依車速）+ 引擎震動（依轉速）+ 路面頓挫（依懸吊），直接驅動方向盤。
+
+```bash
+make                          # 內含 build/g923_ffb_telemetry
+# 1) 用官方 SCS SDK 編遙測外掛並裝進歐卡（見 src/scs-plugin/README.md）
+make scs-plugin SCS_SDK=/path/to/scs_sdk
+# 2) 進遊戲後，讓它讀遙測並驅動方向盤：
+./build/g923_ffb_telemetry --range 900 --gain 1.0
+```
+
+這是「用遊戲狀態合成的力」，不是遊戲物理引擎算出的原生 FFB（那個 Mac 原生版沒開放）；要真 FFB 就走上面的 CrossOver 路線。手感參數（`--gain`、置中/震動/頓挫比例）到時候接上方向盤再調。
+
+ETS2/ATS 的官方 **SCS 遙測 SDK** 也是「自製 TrueForce 高頻振動層」（另一個 v2）最理想的訊號來源。
 
 ## TrueForce（v2，實驗中，需實機）
 
