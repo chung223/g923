@@ -632,3 +632,29 @@ Wine 相關細節（實作 dinput8 proxy 時需要）：
 - 常力方向與手感強度對應（Logitech 文件：`0x00` = 順時針）；自動回正強度對應。
 - `GameController.framework` 是否把 c266 列為 `GCRacingWheel`，以及原生遊戲的獨佔開啟是否會讓常駐程式的 `setReport` 失敗。
 - TrueForce（IF2，vendor `0xFFFD/0xFD01`，64-byte 串流）技術上可自行合成，但會覆蓋 classic FFB 且非遊戲原生訊號，列為 v2 之外。
+
+---
+
+## 10. TrueForce v2 骨架與歐卡（ETS2）路徑（2026-09-08 加入）
+
+### 10.1 已加入 repo 的 v2 元件（預設不啟用）
+
+- **`src/tools/g923_probe_if2.c`**：實機探測工具。列出方向盤所有 HID 介面的 usage page/usage、輸入/輸出報告大小，標示哪個是 IF0 搖桿、IF1 HID++、IF2 TrueForce；`--dump-desc` 印出各介面的 HID report descriptor 原始位元組；`--silence N` 送靜音封包測試 IF2 是否接受（實驗、需實機）。
+- **`src/common/g923_trueforce.{h,c}`**：TrueForce 串流模組骨架。開啟 IF2（usage `0xFFFD/0xFD01`）、封包編碼（report id `0x01` + 13 樣本滾動視窗、每包 4 個新 16-bit 樣本、`0x8000`=靜音）、串流迴圈，以及兩個範例訊號源：`mirror`（把 classic 力鏡射成低頻振動）與 `telemetry`（引擎轉速 + 路面顆粒感，供 ETS2/ATS 用）。**封包格式與 init 握手皆標示 UNVERIFIED**，需用探測工具在實機確認後才可信。
+- 純編碼部分（`g923_tf_encode_packet` 的滾動視窗）已納入單元測試（`make test` 現為 47 項）。
+
+### 10.2 歐卡（Euro Truck Simulator 2，Steam）建議路徑
+
+使用者主要目標是 ETS2。兩條路，建議如下:
+
+1. **相容層跑 Windows 版（最穩）**：CrossOver / Whisky / Wine 帶 `disable-library-validation`,一定載入我們的 `G923FF.plugin`,經典力回饋（方向盤重量、路感、回正）可用。
+2. **原生 macOS 版**：走 SDL;SDL2 haptic 在 macOS 經 `ForceFeedback.framework`,理論上外掛可服務,但需實機確認該版本是否以強化執行期 + 函式庫驗證擋外掛。
+
+**TrueForce 對歐卡的最佳做法**是「自製振動層」而非移植：ETS2/ATS 有官方 **SCS 遙測 SDK**(跨平台,plugin 放進遊戲的 `plugins/` 目錄,以共享記憶體提供引擎轉速、車速、輪胎狀態)。把這些餵進 `g923_tf_source_telemetry`,即可在 IF2 上做出隨引擎/路面變化的高頻振動。這條 v2 工作項需:(a) 用 `g923_probe_if2` 確認 IF2 封包格式,(b) 寫 SCS 遙測讀取器接上 `g923_trueforce`。
+
+### 10.3 v2 待辦（實機後）
+
+1. `g923_probe_if2 --dump-desc` 抓 c266 模式下 IF0/IF1/IF2 完整 descriptor,補上第 9.4/9.6 節的未知。
+2. 確認 IF2 封包格式(封包長度、樣本數、取樣率、init 握手),更新 `g923_trueforce.c` 中所有標 UNVERIFIED 的常數。
+3. 寫 SCS 遙測讀取器(ETS2/ATS),接上 `telemetry` 訊號源。
+4. 把 TrueForce 串流併入 `g923d`,並與 classic FFB 做仲裁(串流時會覆蓋 classic)。

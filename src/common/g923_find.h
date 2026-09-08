@@ -16,4 +16,10 @@ const char *g923_wheel_name(uint16_t pid);
  * IOObjectRelease). Returns IO_OBJECT_NULL if none. Fills vid/pid if non-NULL. */
 io_service_t g923_find_wheel(uint16_t *vid_out, uint16_t *pid_out);
 
+/* Find a specific HID interface of a supported wheel by primary usage page/usage
+ * (e.g. 0xFFFD / 0xFD01 for the TrueForce vendor interface). Caller releases.
+ * Returns IO_OBJECT_NULL if not present. */
+io_service_t g923_find_wheel_iface(uint16_t usage_page, uint16_t usage,
+                                   uint16_t *vid_out, uint16_t *pid_out);
+
 #endif /* G923_FIND_H */

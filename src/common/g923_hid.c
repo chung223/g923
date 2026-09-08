@@ -57,5 +57,12 @@ bool g923_hid_send(g923_hid *h, uint8_t report_id, const uint8_t cmd[G923_CMD_LE
     return r == kIOReturnSuccess;
 }
 
+bool g923_hid_send_report(g923_hid *h, uint8_t report_id, const uint8_t *buf, size_t len) {
+    if (!h->dev || !h->open || !buf || len == 0) return false;
+    IOReturn r = IOHIDDeviceSetReport(h->dev, kIOHIDReportTypeOutput,
+                                      (CFIndex)report_id, buf, (CFIndex)len);
+    return r == kIOReturnSuccess;
+}
+
 uint16_t g923_hid_vendor(g923_hid *h)  { return get_u16(h->dev, CFSTR(kIOHIDVendorIDKey)); }
 uint16_t g923_hid_product(g923_hid *h) { return get_u16(h->dev, CFSTR(kIOHIDProductIDKey)); }

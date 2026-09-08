@@ -16,14 +16,15 @@ FF_FRAMEWORK:= -framework ForceFeedback
 
 BUILD := build
 COMMON_SRC := src/common/g923_effects.c src/common/g923_hid.c \
-              src/common/g923_inject.c src/common/g923_find.c
+              src/common/g923_inject.c src/common/g923_find.c \
+              src/common/g923_trueforce.c
 
 PLUGIN_BUNDLE := $(BUILD)/G923FF.plugin
 PLUGIN_BIN    := $(PLUGIN_BUNDLE)/Contents/MacOS/G923FF
 
-.PHONY: all plugin daemon cli tests test e2e clean install uninstall sign
+.PHONY: all plugin daemon cli tools tests test e2e clean install uninstall sign
 
-all: plugin daemon cli tests
+all: plugin daemon cli tools tests
 
 $(BUILD):
 	@mkdir -p $(BUILD)
@@ -52,10 +53,15 @@ cli: $(BUILD)/g923ctl
 $(BUILD)/g923ctl: src/cli/g923ctl.c $(COMMON_SRC) | $(BUILD)
 	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/cli/g923ctl.c $(COMMON_SRC) $(FRAMEWORKS)
 
+# --- tools (v2 / diagnostics) ---
+tools: $(BUILD)/g923_probe_if2
+$(BUILD)/g923_probe_if2: src/tools/g923_probe_if2.c $(COMMON_SRC) | $(BUILD)
+	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/tools/g923_probe_if2.c $(COMMON_SRC) $(FRAMEWORKS)
+
 # --- tests ---
 tests: $(BUILD)/test_protocol $(BUILD)/ff_probe
-$(BUILD)/test_protocol: src/test/test_protocol.c src/common/g923_effects.c | $(BUILD)
-	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/test/test_protocol.c src/common/g923_effects.c
+$(BUILD)/test_protocol: src/test/test_protocol.c $(COMMON_SRC) | $(BUILD)
+	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/test/test_protocol.c $(COMMON_SRC) $(FRAMEWORKS)
 $(BUILD)/ff_probe: src/test/ff_probe.c | $(BUILD)
 	$(CC) $(CFLAGS) -o $@ src/test/ff_probe.c $(FRAMEWORKS) $(FF_FRAMEWORK)
 

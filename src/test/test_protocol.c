@@ -172,6 +172,34 @@ static void test_engine_conditions(void) {
     check_int("spring encoded slot1", cmds[0], (0x10<<1)+G923_OP_DOWNLOAD);
 }
 
+#include "g923_trueforce.h"
+static void test_trueforce_encode(void) {
+    printf("[trueforce v2: packet encoder]\n");
+    g923_trueforce tf;
+    memset(&tf, 0, sizeof tf);
+    uint8_t pkt[G923_TF_PACKET_LEN];
+
+    /* silence -> report id + all samples at G923_TF_SILENCE (0x8000 LE = 00 80) */
+    int16_t zero[G923_TF_NEW_PER_PACKET] = {0,0,0,0};
+    g923_tf_encode_packet(&tf, zero, pkt);
+    check_int("tf report id", pkt[0], G923_TF_REPORT_ID);
+    check_int("tf silence sample lo", pkt[1], 0x00);
+    check_int("tf silence sample hi", pkt[2], 0x80);
+
+    /* push a positive sample; it lands as the newest window entry (last slot) */
+    int16_t s1[G923_TF_NEW_PER_PACKET] = {0,0,0,1000};
+    g923_tf_encode_packet(&tf, s1, pkt);
+    int last = 1 + (G923_TF_WINDOW_SAMPLES - 1) * 2;
+    uint16_t v = (uint16_t)(pkt[last] | (pkt[last+1] << 8));
+    check_int("tf newest sample value", v, (uint16_t)(G923_TF_SILENCE + 1000));
+
+    /* rolling: another push shifts the window; newest is 2000 */
+    int16_t s2[G923_TF_NEW_PER_PACKET] = {0,0,0,2000};
+    g923_tf_encode_packet(&tf, s2, pkt);
+    v = (uint16_t)(pkt[last] | (pkt[last+1] << 8));
+    check_int("tf newest after roll", v, (uint16_t)(G923_TF_SILENCE + 2000));
+}
+
 int main(void) {
     printf("=== G923 protocol / effects unit tests ===\n");
     test_encoders();
@@ -179,6 +207,7 @@ int main(void) {
     test_engine_constant();
     test_engine_duration();
     test_engine_conditions();
+    test_trueforce_encode();
     printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail ? 1 : 0;
 }

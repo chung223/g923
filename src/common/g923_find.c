@@ -84,3 +84,27 @@ io_service_t g923_find_wheel(uint16_t *vid_out, uint16_t *pid_out) {
     if (chosen != IO_OBJECT_NULL) { if (vid_out) *vid_out = v; if (pid_out) *pid_out = p; }
     return chosen;
 }
+
+io_service_t g923_find_wheel_iface(uint16_t usage_page, uint16_t usage,
+                                   uint16_t *vid_out, uint16_t *pid_out) {
+    io_iterator_t it = IO_OBJECT_NULL;
+    if (IOServiceGetMatchingServices(kIOMainPortDefault,
+            IOServiceMatching("IOHIDDevice"), &it) != KERN_SUCCESS)
+        return IO_OBJECT_NULL;
+    io_service_t s, found = IO_OBJECT_NULL;
+    while ((s = IOIteratorNext(it))) {
+        uint16_t vid = prop_u16(s, CFSTR(kIOHIDVendorIDKey));
+        uint16_t pid = prop_u16(s, CFSTR(kIOHIDProductIDKey));
+        uint16_t up  = prop_u16(s, CFSTR(kIOHIDPrimaryUsagePageKey));
+        uint16_t u   = prop_u16(s, CFSTR(kIOHIDPrimaryUsageKey));
+        if (g923_is_supported_wheel(vid, pid) && up == usage_page && u == usage) {
+            if (vid_out) *vid_out = vid;
+            if (pid_out) *pid_out = pid;
+            found = s;   /* keep */
+            break;
+        }
+        IOObjectRelease(s);
+    }
+    IOObjectRelease(it);
+    return found;
+}

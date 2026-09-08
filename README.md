@@ -47,13 +47,35 @@ make install    # 安裝到 ~/.local/g923 並載入 LaunchAgent
 
 移除：`make uninstall`。
 
+## 歐卡（ETS2，Steam 版）
+
+Euro Truck Simulator 2 是這個專案的主要目標。兩條路：
+
+- **原生 macOS 版**：走 SDL；SDL2 的力回饋在 macOS 是透過 `ForceFeedback.framework`，所以我們的外掛可服務它（前提是該版本未啟用函式庫驗證擋外掛，需實機確認）。
+- **透過 CrossOver / Whisky 跑 Windows 版**：這條最穩，因為這些相容層帶 `disable-library-validation`，一定會載入外掛。
+
+另外 ETS2/ATS 有官方 **SCS 遙測 SDK**，是「自製 TrueForce 振動層」（見 v2）最理想的訊號來源：可用引擎轉速、輪胎打滑、路面顆粒感產生高頻振動。
+
+## TrueForce（v2，實驗中，需實機）
+
+TrueForce 走的是方向盤的第 3 個 HID 介面（vendor `0xFFFD/0xFD01`），與經典力回饋不同。**遊戲原生的 TrueForce 內容無法在 Mac 取得**（那需要 Windows 私有 SDK），但我們可以**自己合成**振動灌進這條通道。這部分標為 v2、預設不啟用，且封包格式尚未經實機確認。
+
+方向盤到手後，先用探測工具確認介面與格式：
+
+```bash
+make tools
+./build/g923_probe_if2 --dump-desc     # 列出方向盤所有 HID 介面 + descriptor
+./build/g923_probe_if2 --silence 100   # (實驗) 送靜音封包，看 IF2 是否接受
+```
+
 ## 目錄結構
 
 ```
-src/common/    協定編碼、效果引擎、HID 傳輸、注入、裝置搜尋
+src/common/    協定編碼、效果引擎、HID 傳輸、注入、裝置搜尋、TrueForce(v2)
 src/plugin/    G923FF.plugin — ForceFeedback CFPlugIn 外掛
 src/daemon/    g923d — 方向盤插上時自動註冊外掛的 LaunchAgent
 src/cli/       g923ctl — 控制與診斷
+src/tools/     g923_probe_if2 — TrueForce 介面探測工具（v2）
 src/test/      單元測試 + ff_probe（模擬遊戲的測試程式）
 scripts/       安裝 / 移除 / 端對端測試
 docs/          研究報告（繁體中文）
