@@ -652,9 +652,19 @@ Wine 相關細節（實作 dinput8 proxy 時需要）：
 
 **TrueForce 對歐卡的最佳做法**是「自製振動層」而非移植：ETS2/ATS 有官方 **SCS 遙測 SDK**(跨平台,plugin 放進遊戲的 `plugins/` 目錄,以共享記憶體提供引擎轉速、車速、輪胎狀態)。把這些餵進 `g923_tf_source_telemetry`,即可在 IF2 上做出隨引擎/路面變化的高頻振動。這條 v2 工作項需:(a) 用 `g923_probe_if2` 確認 IF2 封包格式,(b) 寫 SCS 遙測讀取器接上 `g923_trueforce`。
 
-### 10.3 v2 待辦（實機後）
+### 10.3 SCS 遙測（ETS2/ATS）— 已加入骨架
+
+已把「自製 TrueForce 訊號源」的遙測鏈路寫好骨架：
+
+- **共享記憶體契約** `src/common/g923_telemetry_shm.h`：外掛與讀取器之間的 struct，用 seqlock 讓讀取一致、不擋寫入。
+- **讀取器** `src/common/g923_telemetry_reader.{h,c}`：開啟/取樣共享記憶體、從懸吊變化推導「路面粗糙度」、並轉成 `g923_tf_telemetry_ctx`（TrueForce 訊號源吃的格式）。這部分是純我們的程式，已 build + 單元測試（`make test` 現含 SCS 遙測往返測試 9 項）。
+- **檢視工具** `src/tools/g923_telemetry_dump.c`：不需方向盤即可確認外掛有在送資料（`--watch` 即時刷新）。
+- **SCS 外掛** `src/scs-plugin/g923_scs_plugin.c`：由遊戲載入、訂閱轉速/上限/車速/檔位/懸吊等頻道、寫進共享記憶體。它需要官方 SCS SDK 標頭,所以不在預設 `make`,改用 `make scs-plugin SCS_SDK=/path`（見 `src/scs-plugin/README.md`）。已用代表性的 SDK 型別做過語法檢查。
+
+### 10.4 v2 待辦（實機後）
 
 1. `g923_probe_if2 --dump-desc` 抓 c266 模式下 IF0/IF1/IF2 完整 descriptor,補上第 9.4/9.6 節的未知。
 2. 確認 IF2 封包格式(封包長度、樣本數、取樣率、init 握手),更新 `g923_trueforce.c` 中所有標 UNVERIFIED 的常數。
-3. 寫 SCS 遙測讀取器(ETS2/ATS),接上 `telemetry` 訊號源。
-4. 把 TrueForce 串流併入 `g923d`,並與 classic FFB 做仲裁(串流時會覆蓋 classic)。
+3. 用官方 SCS SDK 編 `make scs-plugin`,裝進歐卡,用 `g923_telemetry_dump` 確認遙測進來。
+4. 把遙測讀取器 → `g923_tf_source_telemetry` → TrueForce 串流串起來,併入 `g923d`,並與 classic FFB 做仲裁(串流時會覆蓋 classic)。
+5. CrossOver/Whisky 的 Windows 版歐卡需要 Windows 版外掛(.dll),用同一份 `g923_scs_plugin.c` 在 Windows / mingw 編。

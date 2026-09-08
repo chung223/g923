@@ -17,12 +17,14 @@ FF_FRAMEWORK:= -framework ForceFeedback
 BUILD := build
 COMMON_SRC := src/common/g923_effects.c src/common/g923_hid.c \
               src/common/g923_inject.c src/common/g923_find.c \
-              src/common/g923_trueforce.c
+              src/common/g923_trueforce.c src/common/g923_telemetry_reader.c
+
+SCS_SDK ?=
 
 PLUGIN_BUNDLE := $(BUILD)/G923FF.plugin
 PLUGIN_BIN    := $(PLUGIN_BUNDLE)/Contents/MacOS/G923FF
 
-.PHONY: all plugin daemon cli tools tests test e2e clean install uninstall sign
+.PHONY: all plugin daemon cli tools tests test e2e clean install uninstall sign scs-plugin
 
 all: plugin daemon cli tools tests
 
@@ -54,19 +56,32 @@ $(BUILD)/g923ctl: src/cli/g923ctl.c $(COMMON_SRC) | $(BUILD)
 	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/cli/g923ctl.c $(COMMON_SRC) $(FRAMEWORKS)
 
 # --- tools (v2 / diagnostics) ---
-tools: $(BUILD)/g923_probe_if2
+tools: $(BUILD)/g923_probe_if2 $(BUILD)/g923_telemetry_dump
 $(BUILD)/g923_probe_if2: src/tools/g923_probe_if2.c $(COMMON_SRC) | $(BUILD)
 	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/tools/g923_probe_if2.c $(COMMON_SRC) $(FRAMEWORKS)
+$(BUILD)/g923_telemetry_dump: src/tools/g923_telemetry_dump.c $(COMMON_SRC) | $(BUILD)
+	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/tools/g923_telemetry_dump.c $(COMMON_SRC) $(FRAMEWORKS)
+
+# --- SCS telemetry plugin (needs the official SCS SDK; not built by default) ---
+# usage: make scs-plugin SCS_SDK=/path/to/scs_sdk
+scs-plugin: | $(BUILD)
+	@test -n "$(SCS_SDK)" || { echo "set SCS_SDK=/path/to/scs_sdk (see src/scs-plugin/README.md)"; exit 1; }
+	$(CC) $(CFLAGS) $(COMMON_INC) -I"$(SCS_SDK)/include" -dynamiclib \
+		-o $(BUILD)/g923_telemetry.dylib src/scs-plugin/g923_scs_plugin.c
+	@echo "built $(BUILD)/g923_telemetry.dylib — install per src/scs-plugin/README.md"
 
 # --- tests ---
-tests: $(BUILD)/test_protocol $(BUILD)/ff_probe
+tests: $(BUILD)/test_protocol $(BUILD)/test_telemetry $(BUILD)/ff_probe
 $(BUILD)/test_protocol: src/test/test_protocol.c $(COMMON_SRC) | $(BUILD)
 	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/test/test_protocol.c $(COMMON_SRC) $(FRAMEWORKS)
+$(BUILD)/test_telemetry: src/test/test_telemetry.c $(COMMON_SRC) | $(BUILD)
+	$(CC) $(CFLAGS) $(COMMON_INC) -o $@ src/test/test_telemetry.c $(COMMON_SRC) $(FRAMEWORKS)
 $(BUILD)/ff_probe: src/test/ff_probe.c | $(BUILD)
 	$(CC) $(CFLAGS) -o $@ src/test/ff_probe.c $(FRAMEWORKS) $(FF_FRAMEWORK)
 
 test: tests
 	@echo; ./$(BUILD)/test_protocol
+	@echo; ./$(BUILD)/test_telemetry
 
 e2e: all
 	@bash scripts/test_e2e.sh

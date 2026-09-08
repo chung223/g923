@@ -71,15 +71,19 @@ make tools
 ## 目錄結構
 
 ```
-src/common/    協定編碼、效果引擎、HID 傳輸、注入、裝置搜尋、TrueForce(v2)
+src/common/    協定編碼、效果引擎、HID 傳輸、注入、裝置搜尋、TrueForce(v2)、遙測讀取(v2)
 src/plugin/    G923FF.plugin — ForceFeedback CFPlugIn 外掛
 src/daemon/    g923d — 方向盤插上時自動註冊外掛的 LaunchAgent
 src/cli/       g923ctl — 控制與診斷
-src/tools/     g923_probe_if2 — TrueForce 介面探測工具（v2）
-src/test/      單元測試 + ff_probe（模擬遊戲的測試程式）
+src/tools/     g923_probe_if2（TrueForce 介面探測）、g923_telemetry_dump（遙測檢視）
+src/scs-plugin/ ETS2/ATS 的 SCS 遙測外掛骨架（需 SCS SDK，另外編）
+src/test/      單元測試（協定 + 遙測）+ ff_probe（模擬遊戲）
 scripts/       安裝 / 移除 / 端對端測試
 docs/          研究報告（繁體中文）
 ```
+
+遙測（v2，給 TrueForce 用）：把 SCS 外掛裝進歐卡（見 [`src/scs-plugin/README.md`](src/scs-plugin/README.md)），
+再用 `./build/g923_telemetry_dump --watch` 檢視即時轉速/車速/路面粗糙度是否有進來。
 
 ## 目前狀態
 
