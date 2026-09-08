@@ -143,3 +143,31 @@ codesign -d --entitlements :- "$APP" 2>&1 | grep -i disable-library-validation
 - `build/G923FF.plugin`：Mach-O **thin arm64**、**adhoc** 簽章、TeamIdentifier not set。→ 不能載入 Rosetta x86_64 宿主，需改 universal。
 - Makefile 無 `-arch` 旗標，`plugin`/`scs-plugin` 皆只出 host(arm64) slice。
 - 本機**未安裝 ETS2**，故第 1–3 項的遊戲端檢查尚未執行。
+
+---
+
+## 11. 實機確認（歐卡已安裝，2026-09-08）
+
+直接檢查了你這台實際安裝的 ETS2（v1.58.1.2，跑在 `/Volumes/SSD/SteamLibrary/...`）。以下是**實測結論，取代前面幾節的推測**：
+
+| 檢查 | 結果 | 意義 |
+|---|---|---|
+| `lipo -archs` | **x86_64** | Rosetta 2 執行；外掛需含 x86_64 slice（本專案已改 universal，符合）。 |
+| `otool -L \| grep ForceFeedback` | **沒有** | 不連結 `ForceFeedback.framework`。 |
+| 二進位內 FF/SDL 字串 | 無 `FFCreateDevice`/`SDL_Haptic`/`libSDL` | 也沒有 dlopen 這些框架。原生版**完全不走 Apple 的 FFB API**。 |
+| `codesign` entitlements | **有 `disable-library-validation`** | 函式庫驗證**關閉**——第三方外掛（含我們的）**可以載入** ETS2 行程。 |
+| 遙測外掛載入器 | **存在**（binary 有 `%s/plugins`、`telemetry api` 錯誤字串、大量 `prism::sdk::telemetry_*` 符號） | 原生 Mac 版**會載入 SCS 遙測外掛**。 |
+| `game.log.txt` | `[gl] version: 4.1 Metal`、`running on x86_64 / OS X 26.2`、用自家 `[hid]` 列舉裝置 | OpenGL-on-Metal；輸入走自家 IOKit HID 層（非 SDL）。 |
+
+### 關鍵結論（比之前更明確）
+
+1. **原生歐卡本身在 Mac 上不輸出力回饋**：它有完整的 FFB 設定選項（`force_feedback_*`），但 binary 沒有任何 macOS 的 FFB 輸出路徑（無 ForceFeedback.framework、無 SDL、無 HID setReport 跡象）。這不是被擋，是**遊戲端根本沒接**。社群「原生無 FFB」屬實。
+2. **我們的 ForceFeedback 外掛對原生歐卡沒用**：因為遊戲不呼叫那個 API，外掛不會被觸發。（之前擔心的 library validation 其實是**關閉**的，所以不是那個問題。）
+3. **原生要有力回饋，唯一的路是「遙測直驅」**：native 版**會載入遙測外掛**，所以做法是——我們的 SCS 遙測外掛把遊戲狀態寫進共享記憶體 → `g923d` 讀取 → **直接用 IOKit HID 對方向盤下經典 FFB 指令**（依車速做置中彈簧、依轉速做震動、依懸吊/碰撞做頓挫）。完全繞過歐卡沒接通的 FFB 輸出。這是「用遙測合成的力」，不是遊戲物理引擎算出來的原生 FFB，但它是**真的力、且原生執行**。
+4. **想要遊戲物理引擎算出的真 FFB**：還是得跑 Windows 版透過 CrossOver/Whisky。
+
+### 原生「遙測直驅」要做的事
+
+- 用官方 SCS SDK 編我們的遙測外掛（universal，x86_64 slice 給 Rosetta 遊戲用）：`make scs-plugin SCS_SDK=...`。
+- 外掛放進歐卡的 plugins 目錄（最可能是 `Euro Truck Simulator 2.app/Contents/MacOS/plugins`，binary 用 `%s/plugins` 尋找；需建立該資料夾並以 game.log 確認）。
+- 在 `g923d` 加一個「telemetry → 經典 FFB」力模型（置中彈簧 + 轉速震動 + 頓挫），直接驅動方向盤。這部分現在就能寫與單元測試，實際手感要有方向盤才能調。
